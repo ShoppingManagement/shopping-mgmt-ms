@@ -3,11 +3,13 @@ package com.pnk.orderservice.service;
 import com.pnk.orderservice.dto.InventoryResponse;
 import com.pnk.orderservice.dto.OrderLineItemsDto;
 import com.pnk.orderservice.dto.OrderRequest;
+import com.pnk.orderservice.event.OrderPlacedEvent;
 import com.pnk.orderservice.model.Order;
 import com.pnk.orderservice.model.OrderLineItems;
 import com.pnk.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -26,6 +28,8 @@ public class OrderService {
     private final OrderRepository orderRepository;
 
     private final WebClient.Builder webClientBuilder;
+
+    private final KafkaTemplate<String, OrderPlacedEvent> kafkaTemplate;
 
 
     public String placeOrder(OrderRequest orderRequest) {
@@ -59,6 +63,8 @@ public class OrderService {
         if (allProductsInStock) {
             log.info("Placing order {}", orderRequest);
             orderRepository.save(order);
+            log.info("Sending to the notificationTopic the order event {}", order.getOrderNumber());
+            kafkaTemplate.send("notificationTopic", new OrderPlacedEvent(order.getOrderNumber()));
 
             return "Order placed successfully.";
         } else {
